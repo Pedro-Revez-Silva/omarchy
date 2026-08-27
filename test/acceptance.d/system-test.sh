@@ -11,9 +11,8 @@ verify_core_packages() {
   local -a missing=()
 
   while IFS= read -r package; do
-    [[ -z $package || $package == \#* ]] && continue
     pacman -Q "$package" >/dev/null 2>&1 || missing+=("$package")
-  done <"$OMARCHY_PATH/install/omarchy-base.packages"
+  done < <("$ROOT/bin/omarchy-pkg-list" base)
 
   (( ${#missing[@]} == 0 )) || fail "all Omarchy core packages are installed" "missing packages: ${missing[*]}"
   pass "all Omarchy core packages are installed (${#missing[@]} missing)"

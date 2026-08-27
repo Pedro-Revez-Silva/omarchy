@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# omarchy:summary=List the default packages for this architecture
+# omarchy:args=[base|other] [--arch ARCH]
+# omarchy:examples=omarchy pkg list base | omarchy pkg list other --arch aarch64
+
+set -euo pipefail
+
+kind="base"
+arch="${OMARCHY_ARCH:-$(uname -m)}"
+
+while (( $# )); do
+  case "$1" in
+    base|other) kind="$1" ;;
+    --arch)
+      (( $# >= 2 )) || { echo "Error: --arch requires a value" >&2; exit 1; }
+      arch="$2"
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: omarchy-pkg-list [base|other] [--arch ARCH]"
+      exit 0
+      ;;
+    *)
+      echo "Error: unsupported argument '$1'" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
+[[ $arch == "arm64" ]] && arch="aarch64"
+[[ $arch == "x86_64" || $arch == "aarch64" ]] || {
+  echo "Error: unsupported architecture '$arch'" >&2
+  exit 1
+}
+
+manifest="$OMARCHY_PATH/install/omarchy-$kind.packages"
+[[ -f $manifest ]] || {
+  echo "Error: package manifest not found: $manifest" >&2
+  exit 1
+}
+
+if [[ $arch == "x86_64" ]]; then
+  sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$manifest"
+  exit 0
+fi
+
+case "$kind" in
+  base)
+    # Arch Linux ARM and Omarchy's ARM repository do not publish these yet.
+    # Keep this architecture contract in the runtime so reinstalls, upgrades,
+    # ISO builds, and acceptance tests all agree on the effective package set.
+    awk '
+      {
+        sub(/[[:space:]]*#.*/, "")
+        sub(/^[[:space:]]+/, "")
+        sub(/[[:space:]]+$/, "")
+      }
+      $0 == "" { next }
+      $0 == "nvim" { print "neovim"; next }
+      $0 ~ /^(dotnet-runtime|obs-studio|obsidian|pinta|qemu-user-static-binfmt)$/ { next }
+      { print }
+    ' "$manifest"
+    ;;
+  other)
+    # Drop PC vendor drivers, x86 kernels, multilib, and Intel/NVIDIA graphics.
+    # Generic firmware, generic ARM graphics, and Asahi graphics stay present.
+    awk '
+      {
+        sub(/[[:space:]]*#.*/, "")
+        sub(/^[[:space:]]+/, "")
+        sub(/[[:space:]]+$/, "")
+      }
+      $0 == "" { next }
+      $0 == "linux" { print "linux-aarch64"; next }
+      $0 == "linux-headers" { print "linux-aarch64-headers"; next }
+      $0 ~ /^(asusctl|broadcom-wl|intel-ipu7-camera|intel-lpmd|intel-media-driver|libva-intel-driver|libva-nvidia-driver)$/ { next }
+      $0 ~ /^(linux-ptl|linux-ptl-headers|macbook12-spi-driver-dkms|thermald|yay-debug)$/ { next }
+      $0 ~ /^(nvidia-580xx-dkms|nvidia-dkms|nvidia-open-dkms|nvidia-580xx-utils|nvidia-utils|lib32-nvidia-580xx-utils|lib32-nvidia-utils)$/ { next }
+      $0 ~ /^(tuxedo-drivers-nocompatcheck-dkms|yt6801-dkms|libvpl|vpl-gpu-rt|vulkan-intel)$/ { next }
+      $0 ~ /^(dell-xps-touchpad-haptics|dell-xps13-sidecar-amps)$/ { next }
+      $0 ~ /^(apple-bcm-firmware|apple-t2-audio-config|linux-t2|linux-t2-headers|t2fanrd|qmk-hid)$/ { next }
+      { print }
+    ' "$manifest"
+    ;;
+esac

@@ -737,15 +737,15 @@ install_omarchy_quattro_packages() {
   as_root env OMARCHY_UPDATE_PACMAN=1 pacman -Syu --needed --noconfirm --ask 4 --overwrite='*' "${core_packages[@]}"
   mark_packages_explicit "${core_packages[@]}"
 
-  if [[ -f /usr/share/omarchy/install/omarchy-base.packages ]]; then
+  if [[ -x /usr/share/omarchy/bin/omarchy-pkg-list ]]; then
     log "Installing Omarchy quattro default package set"
-    mapfile -t base_packages < <(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' /usr/share/omarchy/install/omarchy-base.packages)
+    mapfile -t base_packages < <(OMARCHY_PATH=/usr/share/omarchy /usr/share/omarchy/bin/omarchy-pkg-list base)
     if (( ${#base_packages[@]} )); then
       as_root pacman -S --needed --noconfirm --ask 4 --overwrite='*' "${base_packages[@]}"
       mark_packages_explicit "${base_packages[@]}"
     fi
   else
-    warn "/usr/share/omarchy/install/omarchy-base.packages was not found; skipping default package set install."
+    warn "/usr/share/omarchy/bin/omarchy-pkg-list was not found; skipping default package set install."
   fi
 
   # Archinstall installs the audio application during fresh ISO installs, so
