@@ -80,7 +80,10 @@ wtype "5"
 sleep 1
 screenshot "success-reminder-02-minutes-entered"
 wtype -k Return
-wait_until "reminder message prompt opens" 15 screen_contains "Reminder message"
+# Tesseract can insert extra whitespace between the two rendered words. The
+# prompt is already identified by its layer, so the distinctive second word is
+# the stable visual assertion here.
+wait_until "reminder message prompt opens" 15 screen_contains "message"
 screenshot "success-reminder-03-message-prompt"
 wtype -k Escape
 wait_until "reminder flow closes" 15 layer_absent "omarchy-reminders"
